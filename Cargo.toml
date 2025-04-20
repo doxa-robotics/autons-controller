@@ -1,0 +1,43 @@
+[package]
+name = "autons-controller"
+description = "vexide autons Selector implementation for the V5 controller."
+repository = "https://github.com/doxa-robotics/autons-controller/"
+authors = ["zabackary"]
+license-file = "LICENSE"
+keywords = ["vex", "vexide", "vex-robotics", "robotics", "autonomous", "autons"]
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+# These fields configure default behavior for uploads with `cargo v5`.
+[package.metadata.v5]
+upload-strategy = "differential"
+slot = 1
+icon = "cool-x"
+compress = true
+
+[package.metadata.docs.rs]
+targets = ["armv7a-none-eabi"]
+
+[dependencies]
+vexide = { version = "0.7.0", default-features = false, features = [
+  "async",
+  "core",
+  "devices",
+] }
+vex-sdk = "0.26.0"
+futures = { version = "0.3", default-features = false, features = [
+  "async-await",
+] }
+autons = { version = "0.1.0", default-features = false }
+
+[dev-dependencies]
+vexide = "0.7.0"
+autons = "0.1.0"
+
+[features]
+default = []
+
+# [patch.crates-io]
+# vexide = { path = "../vexide/packages/vexide" }
