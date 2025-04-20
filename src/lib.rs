@@ -126,7 +126,17 @@ impl<R, C: Clone + Display + PartialEq + Ord + 'static, const N: usize> Controll
                                     if selected == 0 {
                                         state_type = SelectorStateType::Route(route.category);
                                     } else {
-                                        state.borrow_mut().selection = Some(selected);
+                                        let mut state = state.borrow_mut();
+                                        state.selection = Some(
+                                            state
+                                                .routes
+                                                .iter()
+                                                .position(|r| {
+                                                    r.name == route.name
+                                                        && r.category == route.category
+                                                })
+                                                .unwrap(),
+                                        );
                                         state_type = SelectorStateType::Done(route.clone());
                                     }
                                 }
@@ -135,7 +145,17 @@ impl<R, C: Clone + Display + PartialEq + Ord + 'static, const N: usize> Controll
                         }
                         SelectorStateType::Done(ref route) => {
                             let description = format!("{} / {}", route.category, route.name);
-                            simple_dialog(controller.clone(), "Route selected", &description).await;
+                            simple_dialog(
+                                controller.clone(),
+                                "- Route selected -",
+                                &description,
+                                if vexide::competition::is_connected() {
+                                    Some("Good luck!")
+                                } else {
+                                    None
+                                },
+                            )
+                            .await;
                         }
                     }
                 }

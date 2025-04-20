@@ -255,7 +255,12 @@ pub async fn horizontal_picker(
     )
 }
 
-pub async fn simple_dialog(controller: Arc<Mutex<Controller>>, title: &str, description: &str) {
+pub async fn simple_dialog(
+    controller: Arc<Mutex<Controller>>,
+    title: &str,
+    description: &str,
+    supporting: Option<&str>,
+) {
     let mut controller: vexide::sync::MutexGuard<Controller> = controller.lock().await;
     sleep(SAFE_UPDATE_DURATION).await;
     _ = controller.screen.try_set_text(center_string(title), 1, 1);
@@ -263,4 +268,10 @@ pub async fn simple_dialog(controller: Arc<Mutex<Controller>>, title: &str, desc
     _ = controller
         .screen
         .try_set_text(center_string(description), 2, 2);
+    if let Some(supporting) = supporting {
+        sleep(SAFE_UPDATE_DURATION).await;
+        _ = controller
+            .screen
+            .try_set_text(center_string(supporting), 3, 2);
+    }
 }
