@@ -169,24 +169,23 @@ pub async fn horizontal_picker(
 
     let selected = Rc::new(RefCell::new(0));
     {
-        let mut controller: vexide::sync::MutexGuard<Controller> = controller.lock().await;
-        controller.screen.clear_screen().await.unwrap();
-        sleep(Duration::from_millis(100)).await;
-        controller
+        sleep(SAFE_UPDATE_DURATION).await;
+        _ = controller.lock().await.screen.try_clear_screen();
+        sleep(SAFE_UPDATE_DURATION).await;
+        _ = controller
+            .lock()
+            .await
             .screen
-            .try_set_text(center_string(prompt), 1, 1)
-            .unwrap();
+            .try_set_text(center_string(prompt), 1, 1);
     }
     futures::select_biased!(
         x = (async {
             let selected = selected.clone();
             loop {
                 {
-                    let mut controller: vexide::sync::MutexGuard<Controller> = controller.lock().await;
-
                     // Handle button presses
                     let mut selected = selected.borrow_mut();
-                    let state = controller.state().unwrap_or_default();
+                    let state = controller.lock().await.state().unwrap_or_default();
 
                     if state.button_left.is_now_pressed() {
                         *selected = (*selected + options.len() - 1) % options.len();
@@ -196,12 +195,12 @@ pub async fn horizontal_picker(
                         let selected_ref = *selected;
                         mem::drop(selected);
                         sleep(SAFE_UPDATE_DURATION).await;
-                        controller.screen.clear_screen().await.unwrap();
+                        _ = controller.lock().await.screen.try_clear_screen();
                         break Some(selected_ref);
                     } else if state.button_b.is_now_pressed() {
                         mem::drop(selected);
                         sleep(SAFE_UPDATE_DURATION).await;
-                        controller.screen.clear_screen().await.unwrap();
+                        _ = controller.lock().await.screen.try_clear_screen();
                         break None;
                     }
                 }
@@ -212,8 +211,6 @@ pub async fn horizontal_picker(
             let selected = selected.clone();
             loop {
                 {
-                    let mut controller_ref: vexide::sync::MutexGuard<Controller> = controller.lock().await;
-
                     // Render to the screen
                     let selected = { *selected.borrow() };
                     let offset: usize =
@@ -237,17 +234,15 @@ pub async fn horizontal_picker(
                         list.pop();
                         list.push_str("> ");
                     }
-                    _ = controller_ref.screen.try_set_text(&list, 2, 1);
-                    mem::drop(controller_ref);
+                    _ = controller.lock().await.screen.try_set_text(&list, 2, 1);
                     sleep(SAFE_UPDATE_DURATION).await;
-                    let mut controller_ref: vexide::sync::MutexGuard<Controller> = controller.lock().await;
                     let range_start = options[0..selected]
                         .iter()
                         .map(|s| s.len() + ITEM_SEPARATOR.len())
                         .sum::<usize>() - offset;
                     let range = range_start..(range_start + options[selected].len());
                     let underline = underline_string(&list, ITEM_UNDERLINE, range);
-                    _ = controller_ref.screen.try_set_text(underline, 3, 1);
+                    _ = controller.lock().await.screen.try_set_text(underline, 3, 1);
                 }
                 sleep(SAFE_UPDATE_DURATION).await;
             }
