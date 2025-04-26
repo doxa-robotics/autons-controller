@@ -3,13 +3,12 @@
 use alloc::{
     rc::Rc,
     string::{String, ToString},
-    sync::Arc,
     vec::Vec,
 };
 use core::{cell::RefCell, mem, time::Duration};
 
 use futures::FutureExt;
-use vexide::{prelude::Controller, sync::Mutex, time::sleep};
+use vexide::{prelude::Controller, time::sleep};
 
 const SAFE_UPDATE_DURATION: Duration = Duration::from_millis(200);
 
@@ -160,7 +159,8 @@ pub fn center_string(s: &str) -> String {
 /// Prompts the user to select
 #[allow(clippy::await_holding_refcell_ref)]
 pub async fn horizontal_picker(
-    controller: Arc<Mutex<Controller>>,
+    controller: Rc<RefCell<Controller>>,
+    is_selecting: Rc<RefCell<bool>>,
     prompt: &str,
     options: Vec<String>,
 ) -> Option<usize> {
@@ -170,11 +170,10 @@ pub async fn horizontal_picker(
     let selected = Rc::new(RefCell::new(0));
     {
         sleep(SAFE_UPDATE_DURATION).await;
-        _ = controller.lock().await.screen.try_clear_screen();
+        _ = controller.borrow_mut().screen.try_clear_screen();
         sleep(SAFE_UPDATE_DURATION).await;
         _ = controller
-            .lock()
-            .await
+            .borrow_mut()
             .screen
             .try_set_text(center_string(prompt), 1, 1);
     }
@@ -185,7 +184,7 @@ pub async fn horizontal_picker(
                 {
                     // Handle button presses
                     let mut selected = selected.borrow_mut();
-                    let state = controller.lock().await.state().unwrap_or_default();
+                    let state = controller.borrow_mut().state().unwrap_or_default();
 
                     if state.button_left.is_now_pressed() {
                         *selected = (*selected + options.len() - 1) % options.len();
@@ -195,13 +194,21 @@ pub async fn horizontal_picker(
                         let selected_ref = *selected;
                         mem::drop(selected);
                         sleep(SAFE_UPDATE_DURATION).await;
-                        _ = controller.lock().await.screen.try_clear_screen();
+                        _ = controller.borrow_mut().screen.try_clear_screen();
                         break Some(selected_ref);
                     } else if state.button_b.is_now_pressed() {
                         mem::drop(selected);
                         sleep(SAFE_UPDATE_DURATION).await;
-                        _ = controller.lock().await.screen.try_clear_screen();
+                        _ = controller.borrow_mut().screen.try_clear_screen();
                         break None;
+                    }
+                    if state.button_power.is_now_pressed() || !*is_selecting.borrow() {
+                        mem::drop(selected);
+                        is_selecting.replace(false);
+                        sleep(SAFE_UPDATE_DURATION).await;
+                        _ = controller.borrow_mut().screen.try_clear_screen();
+                        break None;
+
                     }
                 }
                 sleep(Duration::from_millis(20)).await;
@@ -234,7 +241,7 @@ pub async fn horizontal_picker(
                         list.pop();
                         list.push_str("> ");
                     }
-                    _ = controller.lock().await.screen.try_set_text(&list, 2, 1);
+                    _ = controller.borrow_mut().screen.try_set_text(&list, 2, 1);
                     sleep(SAFE_UPDATE_DURATION).await;
                     let range_start = options[0..selected]
                         .iter()
@@ -242,7 +249,8 @@ pub async fn horizontal_picker(
                         .sum::<usize>() - offset;
                     let range = range_start..(range_start + options[selected].len());
                     let underline = underline_string(&list, ITEM_UNDERLINE, range);
-                    _ = controller.lock().await.screen.try_set_text(underline, 3, 1);
+                    _ = controller.borrow_mut().screen.try_set_text(underline, 3, 1);
+                    sleep(SAFE_UPDATE_DURATION).await;
                 }
                 sleep(SAFE_UPDATE_DURATION).await;
             }
@@ -251,21 +259,26 @@ pub async fn horizontal_picker(
 }
 
 pub async fn simple_dialog(
-    controller: Arc<Mutex<Controller>>,
+    controller: Rc<RefCell<Controller>>,
+    _is_selecting: Rc<RefCell<bool>>,
     title: &str,
     description: &str,
     supporting: Option<&str>,
 ) {
-    let mut controller: vexide::sync::MutexGuard<Controller> = controller.lock().await;
-    sleep(SAFE_UPDATE_DURATION).await;
-    _ = controller.screen.try_set_text(center_string(title), 1, 1);
     sleep(SAFE_UPDATE_DURATION).await;
     _ = controller
+        .borrow_mut()
+        .screen
+        .try_set_text(center_string(title), 1, 1);
+    sleep(SAFE_UPDATE_DURATION).await;
+    _ = controller
+        .borrow_mut()
         .screen
         .try_set_text(center_string(description), 2, 2);
     if let Some(supporting) = supporting {
         sleep(SAFE_UPDATE_DURATION).await;
         _ = controller
+            .borrow_mut()
             .screen
             .try_set_text(center_string(supporting), 3, 2);
     }

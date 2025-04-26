@@ -5,15 +5,15 @@
 
 extern crate alloc;
 
-use alloc::{boxed::Box, format, rc::Rc, sync::Arc, vec, vec::Vec};
-use core::{cell::RefCell, fmt::Display};
+use alloc::{boxed::Box, format, rc::Rc, vec, vec::Vec};
+use core::{cell::RefCell, fmt::Display, time::Duration};
 
 use autons::Selector;
 use display::{horizontal_picker, simple_dialog};
 use vexide::{
     devices::controller::*,
-    sync::Mutex,
     task::{self, Task},
+    time::sleep,
 };
 
 use crate::alloc::string::ToString;
@@ -46,7 +46,11 @@ pub struct ControllerSelect<
 
 impl<R, C: Clone + Display + PartialEq + Ord + 'static, const N: usize> ControllerSelect<R, C, N> {
     /// Creates a new selector from a [`Display`] peripheral and array of routes.
-    pub fn new(controller: Arc<Mutex<Controller>>, routes: [Route<R, C>; N]) -> Self {
+    pub fn new(
+        controller: Rc<RefCell<Controller>>,
+        is_selecting: Rc<RefCell<bool>>,
+        routes: [Route<R, C>; N],
+    ) -> Self {
         const {
             assert!(N > 0, "ControllerSelect requires at least one route.");
         }
@@ -68,10 +72,19 @@ impl<R, C: Clone + Display + PartialEq + Ord + 'static, const N: usize> Controll
             _task: task::spawn(async move {
                 let mut state_type = SelectorStateType::Category;
                 loop {
+                    // If we're connected to a comp control system, we should
+                    // exit since picker should happen before we plug in
+                    if vexide::competition::is_connected() || !*is_selecting.borrow() {
+                        is_selecting.replace(false);
+                        sleep(Duration::from_millis(400)).await;
+                        _ = controller.borrow_mut().screen.try_clear_screen();
+                        break;
+                    }
                     match state_type {
                         SelectorStateType::Category => {
                             match horizontal_picker(
                                 controller.clone(),
+                                is_selecting.clone(),
                                 "- Pick category -",
                                 categories
                                     .clone()
@@ -98,6 +111,7 @@ impl<R, C: Clone + Display + PartialEq + Ord + 'static, const N: usize> Controll
                                 .collect::<Vec<_>>();
                             match horizontal_picker(
                                 controller.clone(),
+                                is_selecting.clone(),
                                 &route_picker_header,
                                 filtered_routes
                                     .iter()
@@ -117,6 +131,7 @@ impl<R, C: Clone + Display + PartialEq + Ord + 'static, const N: usize> Controll
                             let header = format!("Pick in {}:", route.category);
                             match horizontal_picker(
                                 controller.clone(),
+                                is_selecting.clone(),
                                 &header,
                                 vec!["Cancel".to_string(), format!("Confirm {}", route.name)],
                             )
@@ -145,15 +160,13 @@ impl<R, C: Clone + Display + PartialEq + Ord + 'static, const N: usize> Controll
                         }
                         SelectorStateType::Done(ref route) => {
                             let description = format!("{} / {}", route.category, route.name);
+                            is_selecting.replace(true);
                             simple_dialog(
                                 controller.clone(),
+                                is_selecting.clone(),
                                 "- Route selected -",
                                 &description,
-                                if vexide::competition::is_connected() {
-                                    Some("Good luck!")
-                                } else {
-                                    None
-                                },
+                                Some("Good luck!"),
                             )
                             .await;
                         }
