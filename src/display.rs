@@ -5,7 +5,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{cell::RefCell, mem, time::Duration};
+use core::{cell::RefCell, cmp::min, mem, time::Duration};
 
 use futures::FutureExt;
 use vexide::{prelude::Controller, time::sleep};
@@ -123,7 +123,8 @@ const CONTROLLER_WIDTH: usize = 128;
 pub fn underline_string(s: &str, c: char, range: core::ops::Range<usize>) -> String {
     // Find which pixels have the underlined words
     let underlined_pixels: core::ops::Range<usize> =
-        controller_str_width(&s[0..range.start])..controller_str_width(&s[0..range.end]);
+        controller_str_width(&s[0..min(s.len(), range.start)])
+            ..controller_str_width(&s[0..min(s.len(), range.end)]);
 
     // Create a new string with the underlined characters
     let mut result = String::new();
