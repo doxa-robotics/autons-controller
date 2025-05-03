@@ -149,7 +149,10 @@ pub fn center_string(s: &str) -> String {
     const PADDING_CHAR: char = ' ';
     const PADDING_WIDTH: usize = controller_char_width(PADDING_CHAR) + 1;
     let width = controller_str_width(s);
-    let padding = ((CONTROLLER_WIDTH.saturating_sub(width)) / 2) / PADDING_WIDTH;
+    let mut padding = ((CONTROLLER_WIDTH.saturating_sub(width)) / 2) / PADDING_WIDTH;
+    if padding > CONTROLLER_WIDTH {
+        padding = CONTROLLER_WIDTH;
+    }
     let mut result = String::new();
     result.push_str(&PADDING_CHAR.to_string().repeat(padding));
     result.push_str(s);
